@@ -1,0 +1,38 @@
+#      urt0.ums
+#
+#     This file is meant to be similar in spirit to the 
+#     crt0 C runtime startup file that's used to set up
+#     the C environment.  This one establishes a stack
+#     and sets r0 to zero before invoking main
+#
+      .zero  r0
+      .temps r7
+
+#
+# _ustart initializes the stack pointer and calls main()
+# using the regular calling conventions.
+# halts after main returns.
+#
+# Space for the stack is allocated below.
+#
+      .section init
+_ustart:
+      r0 := 0
+      r2 := endstack
+      goto main linking r1
+
+      halt                              // Finis
+#
+# This is a little tricky. We're not putting anything into the text section,
+# but by addressing it here, before stk, we cause umasm to emit all code in the
+# text section ahead of the stack, which makes umdumps easier to read
+#
+
+      .section text    // See if this will force code to be ahead of stack
+#
+# Allocate space (10,000 words) for call stack
+# Label endstack is address of first word *after* the call stack
+#
+      .section stk
+      .space 10000
+endstack:    
