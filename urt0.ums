@@ -6,7 +6,7 @@
 #     and sets r0 to zero before invoking main
 #
       .zero  r0
-      .temps r7
+      .temps r6 r7
 
 #
 # _ustart initializes the stack pointer and calls main()
