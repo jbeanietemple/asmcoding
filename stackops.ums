@@ -1,0 +1,4 @@
+# section: stackops
+# defines operations within the stack
+
+get2args: 

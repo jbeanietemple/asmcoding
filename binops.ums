@@ -1,5 +1,5 @@
-# Section: add
-# For these binops, r7 will always store x and r6 will always store y
+# Section: binops
+# For these operations, r6 will always store x and r7 will always store y
 
 add:
     pop r7 off stack r2
@@ -30,6 +30,10 @@ div:
     push r5 on stack r2
     goto readin
 
+divbyzero:
+    r4 = zeroerr
+    goto printstr
+
 bitor:
     pop r7 off stack r2
     pop r6 off stack r2
@@ -44,13 +48,14 @@ bitand:
     push r5 on stack r2
     goto readin
 
+swap:
+    pop r7 off stack r2
+    pop r6 off stack r2
+    push r7 on stack r2
+    push r6 on stack r2
 
-
-divbyzero:
-    r4 = zeroerr
-    goto printstr
-
-
+rmone:
+    pop stack r2
 
 
 
