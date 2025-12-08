@@ -1,8 +1,6 @@
-#   File: callmain.ums
+# callmain.ums
+# Final init: call main, then halt.
 
 .section init
-main:
-    push r1 on stack r2
-    goto waiting linking r1
-    pop r1 off stack r2
-    goto r1
+    goto main linking r1
+    halt

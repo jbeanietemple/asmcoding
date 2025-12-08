@@ -1,13 +1,19 @@
-#   File: urt0.ums
+# urt0.ums
+# Startup runtime; sets r0 = 0 and initializes call stack in r2.
+# Calling convention:
+#   r0 = 0 always
+#   r1 = return address / return value
+#   r2 = call stack pointer (grows downward)
+#   r3,r4 = nonvolatile
+#   r5,r6,r7 = volatile
 
-    .zero  r0
-    .temps r6 r7
-    .section init
-_ustart:
-    r0 := 0
-    r2 := endstack
-                            
-    .section text    
-    .section stk
+.zero  r0
+.temps r6, r7
+
+.section data
+callstack:
     .space 10000
-endstack:    
+callstack_end:
+
+.section init
+    r2 := callstack_end
