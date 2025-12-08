@@ -1,9 +1,191 @@
 
 
 
-main:
-
-
-
+main:    
+    r3 := 0         # Sets the stack size to 0
 
 readin:
+    r6 = input()                    # Receives the character input to r6
+    if (r6 == -1) goto endin        # Checks for eof
+    if (r6 > 127) goto invalid      # There are no valid inputs after 127
+    r7 := jumptable + r6
+    r7 := m[r0][r7]
+    
+
+
+
+
+
+
+
+
+endin:
+    goto r1
+
+nothing:
+
+invalid:
+
+printcommand:
+
+space:
+
+bitand:
+
+mult:
+
+add:
+
+divide:
+
+digit:
+
+changesign:
+
+duplicate:
+
+popfromstack:
+
+swapstack:
+
+clearstack:
+
+bitor:
+
+bitcomplement:
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#                       Data section + jumptable
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+.section data
+
+jumptable:
+    .data nothing               //  Case 0 
+    .data nothing       
+    .data nothing
+    .data nothing       
+    .data nothing
+    .data nothing       
+    .data nothing
+    .data nothing       
+    .data nothing       
+    .data nothing     
+    .data printcommand          //  Case 10: Return
+    .data nothing       
+    .data nothing              
+    .data printcommand          //  Case 13: Return
+    .data nothing       
+    .data nothing      
+    .data nothing       
+    .data nothing      
+    .data nothing       
+    .data nothing       
+    .data nothing               //  Case 20
+    .data nothing       
+    .data nothing
+    .data nothing       
+    .data nothing
+    .data nothing       
+    .data nothing
+    .data nothing       
+    .data nothing       
+    .data nothing      
+    .data nothing               //  Case 30
+    .data nothing               //  Case 31
+    .data space                 //  Case 32: Space
+    .data invalid               
+    .data invalid               
+    .data invalid               
+    .data invalid   
+    .data invalid               
+    .data bitand                //  Case 38: &
+    .data invalid
+    .data invalid               //  Case 40
+    .data invalid
+    .data mult                  //  Case 42: *
+    .data add                   //  Case 43: +
+    .data invalid
+    .data invalid
+    .data invalid
+    .data divide                //  Case 47: /
+    .data digit     // 0        //  Case 48: begin nums
+    .data digit
+    .data digit
+    .data digit
+    .data digit
+    .data digit
+    .data digit
+    .data digit
+    .data digit
+    .data digit     // 9        //  Case 57: end nums
+    .data invalid
+    .data invalid
+    .data invalid               //  Case 60
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid               //  Case 70
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid               //  Case 80
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid               //  Case 90
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data changesign            //  Case 99: c
+    .data duplicate             //  Case 100: d
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid               //  Case 110
+    .data invalid
+    .data popfromstack          //  Case 112: p
+    .data invalid
+    .data invalid
+    .data swapstack             //  Case 115: s
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid               //  Case 120
+    .data invalid
+    .data clearstack            //  Case 122: z
+    .data invalid
+    .data bitor                 //  Case 124: |
+    .data invalid
+    .data bitcomplement         //  Case 126: ~
+    .data invalid               //  Case 127
+

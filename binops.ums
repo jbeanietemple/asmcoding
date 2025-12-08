@@ -31,7 +31,7 @@ div:
     goto readin
 
 divbyzero:
-    r4 = zeroerr
+    r4 := zeroerr
     goto printstr
 
 bitor:
@@ -56,6 +56,8 @@ swap:
 
 rmone:
     pop stack r2
+
+
 
 
 

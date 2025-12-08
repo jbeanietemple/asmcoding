@@ -1,0 +1,8 @@
+#   File: callmain.ums
+
+.section init
+main:
+    push r1 on stack r2
+    goto waiting linking r1
+    pop r1 off stack r2
+    goto r1

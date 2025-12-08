@@ -1,6 +1,8 @@
 
 
 
+printop:
+
 
 
 
@@ -27,5 +29,5 @@ pformat:
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 zeroerr:
-    .string "Cannot divide by 0!"
+    .string "Division by zero"
 
