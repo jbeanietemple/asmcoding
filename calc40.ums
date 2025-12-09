@@ -1,1 +1,485 @@
+###############################################################################
+#                           Initialize the table
+###############################################################################
 .section init
+set_tracker_var:
+    r7 := 0
+init_table:
+    m[r0][jumptable + r7] := invalidin
+    r7 := r7 + 1
+    if (r7 < 256) goto init_table 
+    m[r0][jumptable + '0'] := digit
+    m[r0][jumptable + '1'] := digit
+    m[r0][jumptable + '2'] := digit
+    m[r0][jumptable + '3'] := digit
+    m[r0][jumptable + '4'] := digit
+    m[r0][jumptable + '5'] := digit
+    m[r0][jumptable + '6'] := digit
+    m[r0][jumptable + '7'] := digit
+    m[r0][jumptable + '8'] := digit
+    m[r0][jumptable + '9'] := digit
+    m[r0][jumptable + ’ ’] := waiting
+
+
+###############################################################################
+#                           Main loop
+###############################################################################
+.section text
+main:    
+    r3 := 0                         # Sets the stack size to 0
+waiting:
+    r6 = input()
+readin:
+    if (r6 == -1) goto endin        # Checks for eof
+    if (r6 == '\n') goto printstack
+    r5 := jumptable + r6
+    r5 := m[r0][r5]
+    goto r5
+
+
+digit:
+    r7 = input()                    
+    if (r7 == -1) goto endin
+    if (r7 == '\n') goto enddigitprint
+    r5 := jumptable + r7
+    r5 := m[r0][r5]
+    if (m[r0][r5] != digit) goto enddigit
+    r6 := r6 * 10
+    r6 := r6 + r7
+    goto digit
+enddigit:
+    push r6 on stack r2
+    r3 := r3 + 1
+    goto r5
+enddigitprint:
+    push r6 on stack r2
+    r3 := r3 + 1
+    goto printstack
+
+
+endin:
+    if (r3 == 0) goto r1
+    pop stack r2
+    r3 := r3 - 1
+    goto endin
+
+
+printstack:
+    r6 := r3                        
+    r7 := r2
+printstackloop:
+    if (r6 == 0) goto endloop
+    pop r5 off stack r7
+    push r5 on stack r7
+
+    output '>'
+    output '>'
+    output '>'
+    output ' '
+
+    push r1 on stack r2
+    goto print_word linking r1
+    pop r1 off stack r2
+printnext:
+    output '\n'                     # Print newline after each number
+    r6 := r6 - 1                    # Decrement counter
+    r7 := r7 - 1                    # Move down the stack
+    goto printloop
+    
+
+endloop:
+    goto waiting
+
+
+
+printstring:
+    r7 := m[r0][r4]            
+    if (r7 == 0) goto endprint
+    output r7                   
+    r4 := r4 + 1
+    goto printstring
+endprint:
+    goto r1
+
+###############################################################################
+###############################################################################
+####    
+####                        Instruction modules
+####
+###############################################################################
+###############################################################################
+
+###############################################################################
+#                           Addition module (+)
+###############################################################################
+.section init
+m[r0][jumptable + ’+’] := add
+.section text
+add:
+    if (r3 < 2) goto not2args
+    pop r7 off stack r2
+    pop r6 off stack r2
+    r5 := r6 + r7
+    push r5 on stack r2
+    r3 := r3 - 1
+    goto waiting
+
+###############################################################################
+#                           Subtraction module (-)
+###############################################################################
+.section init
+m[r0][jumptable + ’-’] := sub
+.section text
+sub:
+    if (r3 < 2) goto not2args
+    pop r7 off stack r2
+    pop r6 off stack r2
+    r5 := r6 - r7
+    push r5 on stack r2
+    r3 := r3 - 1
+    goto waiting
+
+###############################################################################
+#                           Multiply module (*)
+###############################################################################
+.section init
+m[r0][jumptable + ’*’] := mul
+.section text
+mul:
+    if (r3 < 2) goto not2args
+    pop r7 off stack r2
+    pop r6 off stack r2
+    r5 := r6 * r7
+    push r5 on stack r2
+    r3 := r3 - 1
+    goto waiting
+
+###############################################################################
+#                           Division module (/)
+###############################################################################
+.section init
+m[r0][jumptable + ’/’] := div
+.section text
+div:
+    if (r3 < 2) goto not2args
+    pop r7 off stack r2
+    if (r7 == 0) goto divbyzero
+    pop r6 off stack r2
+    r5 := r6 / r7
+    push r5 on stack r2
+    r3 := r3 - 1
+    goto waiting
+divbyzero:
+    push r7 on stack r2
+    r4 := zerodivmsg
+    goto errprint
+.section data
+zerodivmsg:
+    .string "Division by zero"
+
+###############################################################################
+#                           Bitwise-or module (|)
+###############################################################################
+.section init
+m[r0][jumptable + ’|’] := bitor
+.section text
+bitor:
+    if (r3 < 2) goto not2args
+    pop r7 off stack r2
+    pop r6 off stack r2
+    r5 := r6 | r7
+    push r5 on stack r2
+    r3 := r3 - 1
+    goto waiting
+
+###############################################################################
+#                           Bitwise-and module (&)
+###############################################################################
+.section init
+m[r0][jumptable + ’&’] := bitand
+.section text
+bitand:
+    if (r3 < 2) goto not2args
+    pop r7 off stack r2
+    pop r6 off stack r2
+    r5 := r6 & r7
+    push r5 on stack r2
+    r3 := r3 - 1
+    goto waiting
+
+###############################################################################
+#                           Swap data module (s)
+###############################################################################
+.section init
+m[r0][jumptable + ’s’] := swap
+.section text
+swap:
+    if (r3 < 2) goto not2args
+    pop r7 off stack r2
+    pop r6 off stack r2
+    push r7 on stack r2
+    push r6 on stack r2
+    goto waiting
+
+###############################################################################
+#                           Change sign module (c)
+###############################################################################
+.section init
+m[r0][jumptable + ’c’] := changesign
+.section text
+changesign:
+    pop r7 off stack r2
+    r5 := r0 - r7
+    push r5 on stack r2
+    goto waiting
+
+###############################################################################
+#                           Bit-complement module (~)
+###############################################################################
+.section init
+m[r0][jumptable + ’~’] := bitcomp
+.section text
+bitcomp:
+    pop r7 off stack r2
+    r5 := r7 !& r7
+    push r5 on stack r2
+    goto waiting
+
+###############################################################################
+#                           Duplicate module (d)
+###############################################################################
+.section init
+m[r0][jumptable + ’d’] := duplicate
+.section text
+duplicate:
+    pop r7 off stack r2
+    push r7 on stack r2
+    push r7 on stack r2
+    r3 := r3 + 1
+    goto waiting
+
+###############################################################################
+#                           Pop one module (d)
+###############################################################################
+.section init
+m[r0][jumptable + ’p’] := popone
+.section text
+popone:
+    pop stack r2
+    r3 := r3 - 1
+    goto waiting
+
+###############################################################################
+#                           Pop all module (z)
+###############################################################################
+.section init
+m[r0][jumptable + ’z’] := zerostack
+.section text
+zerostack:
+    if (r3 == 0) goto waiting
+    pop stack r2
+    r3 := r3 - 1
+    goto zerostack
+
+
+###############################################################################
+###############################################################################
+####    
+####                        Exception modules
+####
+###############################################################################
+###############################################################################
+
+###############################################################################
+#           Prints the message if the given char is invalid
+###############################################################################
+invalidin:
+    r4 := invalidcharmsg
+invalidprint:
+    push r1 on stack r2
+    goto printstring linking r1
+    pop r1 off stack r2
+    output '''
+    output r6
+    output '''
+    output '\n'
+    goto waiting
+
+###############################################################################
+#           Calls an error msg if the stack size is < 2
+###############################################################################
+not2args: 
+    r4 := not2argsmsg
+    goto errprint
+
+###############################################################################
+#           Calls an error msg if the stack size is < 1
+###############################################################################
+not1arg:
+    r4 := not1argmsg
+    goto errprint
+
+###############################################################################
+#           Prints an error msg if the stack size is < 2
+###############################################################################
+errprint:
+    push r1 on stack r2
+    goto printstring linking r1
+    pop r1 off stack r2
+    output '\n'
+    goto waiting
+
+
+###############################################################################
+###############################################################################
+####    
+####                        String const data
+####
+###############################################################################
+###############################################################################
+.section data
+not2argsmsg: 
+    .string "Stack underflow---expected at least 2 elements"
+
+not1argmsg:
+    .string "Stack underflow---expected at least 1 element"
+
+zerodivmsg:
+    .string "Division by zero"
+
+invalidcharmsg: 
+    .string "Unknown character "
+
+###############################################################################
+#                       Data section + jumptable
+###############################################################################
+.section rodata
+jumptable:
+    .data nothing               //  Case 0 
+    .data nothing       
+    .data nothing
+    .data nothing       
+    .data nothing
+    .data nothing       
+    .data nothing
+    .data nothing       
+    .data nothing       
+    .data nothing     
+    .data printcommand          //  Case 10: Return
+    .data nothing       
+    .data nothing              
+    .data printcommand          //  Case 13: Return
+    .data nothing       
+    .data nothing      
+    .data nothing       
+    .data nothing      
+    .data nothing       
+    .data nothing       
+    .data nothing               //  Case 20
+    .data nothing       
+    .data nothing
+    .data nothing       
+    .data nothing
+    .data nothing       
+    .data nothing
+    .data nothing       
+    .data nothing       
+    .data nothing      
+    .data nothing               //  Case 30
+    .data nothing               //  Case 31
+    .data space                 //  Case 32: Space
+    .data invalid               
+    .data invalid               
+    .data invalid               
+    .data invalid   
+    .data invalid               
+    .data bitand                //  Case 38: &
+    .data invalid
+    .data invalid               //  Case 40
+    .data invalid
+    .data mult                  //  Case 42: *
+    .data add                   //  Case 43: +
+    .data invalid
+    .data invalid
+    .data invalid
+    .data divide                //  Case 47: /
+    .data digit     // 0        //  Case 48: begin nums
+    .data digit
+    .data digit
+    .data digit
+    .data digit
+    .data digit
+    .data digit
+    .data digit
+    .data digit
+    .data digit     // 9        //  Case 57: end nums
+    .data invalid
+    .data invalid
+    .data invalid               //  Case 60
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid               //  Case 70
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid               //  Case 80
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid               //  Case 90
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data changesign            //  Case 99: c
+    .data duplicate             //  Case 100: d
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid               //  Case 110
+    .data invalid
+    .data popfromstack          //  Case 112: p
+    .data invalid
+    .data invalid
+    .data swapstack             //  Case 115: s
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid
+    .data invalid               //  Case 120
+    .data invalid
+    .data clearstack            //  Case 122: z
+    .data invalid
+    .data bitor                 //  Case 124: |
+    .data invalid
+    .data bitcomplement         //  Case 126: ~
+    .data invalid               //  Case 127
