@@ -1,601 +1,570 @@
-###############################################################################
-# calc40.ums
-# RPN calculator implementation in UMASM.
+################################################################################
 #
-# Calling convention:
-#   r0 = 0
-#   r1 = return address / result
-#   r2 = call stack pointer
-#   r3,r4 nonvolatile
-#   r5,r6,r7 volatile
+#                      calc40.ums
 #
-# Value stack:
-#   Stored in array values[10000] in segment 0.
-#   r4 is the value-stack pointer; stack grows downward:
-#       initial r4 = values_end
-#       push:  "push rx on stack r4"
-#       pop:   "pop rx off stack r4"
-#   Number of values = values_end - r4.
-###############################################################################
+#     Assignment: Assembly-Language Programming
+#     Authors:    Julian DuTemple (jdutem01), Tanner Vales (tvales01)
+#     Date:       2025-12-09
+#
+#     Summary:
+#       RPN calculator implementation in UMASM. Handles the main event loop,
+#       digit entry state machine, stack manipulation, and arithmetic
+#       operations.
+#
+#     Calling convention:
+#       r0 = 0
+#       r1 = return address / result / scratch
+#       r2 = call stack pointer
+#       r3, r4 nonvolatile (r4 = value stack pointer)
+#       r5, r6, r7 volatile (r6, r7 reserved for assembler temps)
+#
+#     Value stack:
+#       Stored in array values[10000] in segment 0.
+#       r4 is the value-stack pointer; stack grows downward.
+#
+################################################################################
 
-
-###############################################################################
+################################################################################
 #                           Data + Jump Table Storage
-###############################################################################
-.temps r5, r6, r7
+################################################################################
+.temps r6, r7
+.zero r0
 
 .section data
-
 values:
-    .space 10000
+        .space 10000
 values_end:
 
-
 .section rodata
-
 jumptable:
-    .space 256
+        .space 256
 
-
-
-###############################################################################
+################################################################################
 #                           Helper Routines (text)
-###############################################################################
+################################################################################
 .section text
 
-# ---------------------------------------------------------------------------
-# underflow
-#   Input: r5 = n (required number of elements)
-#   Effect: prints
-#     "Stack underflow---expected at least n elements\n"
-#   Preserves: r3,r4; returns to r1.
-# ---------------------------------------------------------------------------
+# ********** underflow **********
+#
+# Print an error message indicating stack underflow and the number of elements
+# expected.
+#
+# Parameters:
+#       r5: The number of elements expected (integer).
+#
+# Return:
+#       None (void).
+#
+# Expects:
+#       r5 contains a valid integer. r1 contains return address.
+#
+# Notes:
+#       Prints "Stack underflow---expected at least N element(s)\n".
+#       Handles pluralization of "element" vs "elements".
+# *******************************
 underflow:
-    # Save return address; we do not touch r3 or r4 at all.
-    push r1 on stack r2
+        push r1 on stack r2
+        push r5 on stack r2     # Save n (r5) because print_word clobbers it
 
-    # "Stack underflow---expected at least "
-    output 'S'; output 't'; output 'a'; output 'c'; output 'k'
-    output ' '; output 'u'; output 'n'; output 'd'; output 'e'
-    output 'r'; output 'f'; output 'l'; output 'o'; output 'w'
-    output '-'; output '-'; output '-'
-    output 'e'; output 'x'; output 'p'; output 'e'; output 'c'
-    output 't'; output 'e'; output 'd'; output ' '; output 'a'
-    output 't'; output ' '; output 'l'; output 'e'; output 'a'
-    output 's'; output 't'; output ' '
+        # Print "Stack underflow---expected at least "
+        output 'S'; output 't'; output 'a'; output 'c'; output 'k'
+        output ' '; output 'u'; output 'n'; output 'd'; output 'e'
+        output 'r'; output 'f'; output 'l'; output 'o'; output 'w'
+        output '-'; output '-'; output '-'
+        output 'e'; output 'x'; output 'p'; output 'e'; output 'c'
+        output 't'; output 'e'; output 'd'; output ' '; output 'a'
+        output 't'; output ' '; output 'l'; output 'e'; output 'a'
+        output 's'; output 't'; output ' '
 
-    # print n (in r5)
-    goto print_word linking r1
+        # r5 holds n. Print it.
+        goto print_word linking r1
 
-    # " elements"
-    output ' '; output 'e'; output 'l'; output 'e'; output 'm'
-    output 'e'; output 'n'; output 't'; output 's'
-    output '\n'
+        # Print " element"
+        output ' '; output 'e'; output 'l'; output 'e'; output 'm'
+        output 'e'; output 'n'; output 't'
 
-    pop r1 off stack r2
-    goto r1
+        # Restore n to check for plural
+        pop r5 off stack r2
 
+        r3 := 1
+        # Check if n == 1.
+        # Use r1 as scratch; real return address is safe on the stack.
+        if (r5 == r3) goto uf_done using r1
 
-# ---------------------------------------------------------------------------
-# check1: require at least 1 value on value stack
-#   On success: returns to caller (goto r1).
-#   On failure: prints underflow and goto waiting.
-# ---------------------------------------------------------------------------
+        output 's'
+
+uf_done:
+        output '\n'
+        pop r1 off stack r2
+        goto r1
+
+# ********** check1 **********
+#
+# Ensure there is at least 1 value on the value stack.
+#
+# Parameters:
+#       None.
+#
+# Return:
+#       Returns to caller if check passes.
+#       Does NOT return if check fails (jumps to waiting loop).
+#
+# Expects:
+#       r4 is the value stack pointer.
+#       r1 is the return address.
+# ****************************
 check1:
-    push r3 on stack r2
+        push r3 on stack r2
+        r3 := r4
+        r3 := r3 nand r3
+        r5 := 1
+        r3 := r3 + r5
+        r5 := values_end
+        r3 := r3 + r5
 
-    # r3 := values_end - r4  (via two's complement; avoid '-')
-    # r3 = -r4
-    r3 := r4
-    r3 := r3 nand r3
-    r5 := 1
-    r3 := r3 + r5
-    # r3 = values_end - r4
-    r3 := r3 + values_end
+        # using r5 as temp
+        if (r3 <s 1) goto c1_fail using r5
 
-    if (r3 <s 1) goto c1_fail
-
-    pop r3 off stack r2
-    goto r1
+        pop r3 off stack r2
+        goto r1
 
 c1_fail:
-    pop r3 off stack r2
-    r5 := 1
-    goto underflow linking r1
-    goto waiting
+        pop r3 off stack r2
+        r5 := 1
+        goto underflow linking r1
+        goto waiting
 
-
-# ---------------------------------------------------------------------------
-# check2: require at least 2 values
-# ---------------------------------------------------------------------------
+# ********** check2 **********
+#
+# Ensure there are at least 2 values on the value stack.
+#
+# Parameters:
+#       None.
+#
+# Return:
+#       Returns to caller if check passes.
+#       Does NOT return if check fails (jumps to waiting loop).
+#
+# Expects:
+#       r4 is the value stack pointer.
+#       r1 is the return address.
+# ****************************
 check2:
-    push r3 on stack r2
+        push r3 on stack r2
+        r3 := r4
+        r3 := r3 nand r3
+        r5 := 1
+        r3 := r3 + r5
+        r5 := values_end
+        r3 := r3 + r5
 
-    # r3 := values_end - r4  (via two's complement; avoid '-')
-    r3 := r4
-    r3 := r3 nand r3
-    r5 := 1
-    r3 := r3 + r5
-    r3 := r3 + values_end
+        # using r5 as temp
+        if (r3 <s 2) goto c2_fail using r5
 
-    if (r3 <s 2) goto c2_fail
-
-    pop r3 off stack r2
-    goto r1
+        pop r3 off stack r2
+        goto r1
 
 c2_fail:
-    pop r3 off stack r2
-    r5 := 2
-    goto underflow linking r1
-    goto waiting
+        pop r3 off stack r2
+        r5 := 2
+        goto underflow linking r1
+        goto waiting
 
-
-# ---------------------------------------------------------------------------
-# print_stack
-#   Prints the value stack from top to bottom:
-#     >>> value\n
-#   Uses print_word; preserves r4.
-# ---------------------------------------------------------------------------
+# ********** print_stack **********
+#
+# Print all values currently on the value stack.
+#
+# Parameters:
+#       None.
+#
+# Return:
+#       None.
+#
+# Expects:
+#       r4 points to the top of the value stack.
+# *********************************
 print_stack:
-    push r1 on stack r2
-    push r3 on stack r2
-    push r4 on stack r2
-    push r5 on stack r2
-    push r6 on stack r2
+        push r1 on stack r2
+        push r3 on stack r2
+        push r4 on stack r2
+        push r5 on stack r2
 
-    r3 := r4             # addr = top
-    r6 := values_end     # end (one past last element)
+        r3 := r4                # r3 = current pointer
 
 ps_loop:
-    if (r3 == r6) goto ps_done
+        r5 := values_end
 
-    # load value
-    r5 := m[r0][r3]
+        # r3==r5 needs extra scratch registers.
+        # r1 is currently garbage (saved on stack), so it is safe to use.
+        if (r3 == r5) goto ps_done using r1
 
-    # ">>> "
-    output '>'; output '>'; output '>'; output ' '
-
-    # print decimal
-    goto print_word linking r1
-
-    # newline
-    output '\n'
-
-    r3 := r3 + 1
-    goto ps_loop
+        r5 := m[r0][r3]
+        output '>'; output '>'; output '>'; output ' '
+        goto print_word linking r1
+        output '\n'
+        r3 := r3 + 1
+        goto ps_loop
 
 ps_done:
-    pop r6 off stack r2
-    pop r5 off stack r2
-    pop r4 off stack r2
-    pop r3 off stack r2
-    pop r1 off stack r2
-    goto r1
+        pop r5 off stack r2
+        pop r4 off stack r2
+        pop r3 off stack r2
+        pop r1 off stack r2
+        goto r1
 
-
-# ---------------------------------------------------------------------------
-# input_error
-#   Unknown character: prints "Unknown character '<c>'\n" and returns to waiting.
-#   r1 contains the character.
-# ---------------------------------------------------------------------------
+# ********** input_error **********
+#
+# Handle invalid input characters.
+#
+# Parameters:
+#       r1: The invalid character.
+#
+# Return:
+#       Does not return to caller; jumps to waiting loop.
+# *********************************
 input_error:
-    # save character temporarily
-    push r1 on stack r2
+        push r1 on stack r2
+        output 'U'; output 'n'; output 'k'; output 'n'; output 'o'
+        output 'w'; output 'n'
+        output ' '; output 'c'; output 'h'; output 'a'; output 'r'
+        output 'a'; output 'c'; output 't'; output 'e'; output 'r'
+        output ' '
+        r3 := 39
+        output r3
+        pop r5 off stack r2
+        output r5
+        output r3
+        output '\n'
+        goto waiting
 
-    # "Unknown character "
-    output 'U'; output 'n'; output 'k'; output 'n'; output 'o'; output 'w'; output 'n'
-    output ' '; output 'c'; output 'h'; output 'a'; output 'r'; output 'a'; output 'c'; output 't'; output 'e'; output 'r'
-    output ' '
-
-    # print opening '
-    r6 := 39          # ASCII '
-    output r6
-
-    # print character
-    pop r5 off stack r2
-    output r5
-
-    # closing ' and newline
-    output r6
-    output '\n'
-
-    goto waiting
-
-
-
-###############################################################################
+################################################################################
 #                           Operator Handlers
-###############################################################################
+################################################################################
 
-# ---------------------------------------------------------------------------
-# digit_waiting
-#   r1: ASCII '0'..'9'
-#   pushes value and goes to entering state.
-# ---------------------------------------------------------------------------
+# ********** digit_waiting **********
+#
+# Handle digit input while in the waiting state. Pushes the digit value
+# and transitions to the entering state.
+#
+# Parameters:
+#       r1: The digit character ('0'..'9').
+# ***********************************
 digit_waiting:
-    # r5 := r1 - '0' via two's complement; avoid '-'
-    r5 := '0'           # base
-    r5 := r5 nand r5    # ~'0'
-    r6 := 1
-    r5 := r5 + r6       # -'0'
-    r5 := r1 + r5       # r1 - '0'
+        r3 := '0'
+        r3 := r3 nand r3
+        r5 := 1
+        r3 := r3 + r5
+        r5 := r1 + r3
+        push r5 on stack r4
+        goto entering
 
-    push r5 on stack r4
-    goto entering
+# ********** Operators **********
+# Each operator pops arguments from r4, performs the operation, and pushes
+# result back to r4. Returns to waiting state.
+# *******************************
 
-
-# ---------------------------------------------------------------------------
-# newline: print stack
-# ---------------------------------------------------------------------------
 op_newline:
-    goto print_stack linking r1
-    goto waiting
+        goto print_stack linking r1
+        goto waiting
 
-
-# ---------------------------------------------------------------------------
-# '+'
-# ---------------------------------------------------------------------------
 op_add:
-    goto check2 linking r1
-    pop r7 off stack r4   # y
-    pop r6 off stack r4   # x
-    r5 := r6 + r7
-    push r5 on stack r4
-    goto waiting
+        goto check2 linking r1
+        pop r1 off stack r4
+        pop r5 off stack r4
+        r5 := r5 + r1
+        push r5 on stack r4
+        goto waiting
 
-
-# ---------------------------------------------------------------------------
-# '-'
-# ---------------------------------------------------------------------------
 op_sub:
-    goto check2 linking r1
-    pop r7 off stack r4   # y
-    pop r6 off stack r4   # x
+        goto check2 linking r1
+        pop r1 off stack r4
+        pop r5 off stack r4
+        r1 := r1 nand r1
+        r3 := 1
+        r1 := r1 + r3
+        r5 := r5 + r1
+        push r5 on stack r4
+        goto waiting
 
-    # r5 := x - y via two's complement: x + (~y + 1)
-    r5 := r7
-    r5 := r5 nand r5      # r5 = ~y
-    r7 := 1
-    r5 := r5 + r7         # r5 = -y
-    r5 := r6 + r5         # r5 = x - y
-
-    push r5 on stack r4
-    goto waiting
-
-
-# ---------------------------------------------------------------------------
-# '*'
-# ---------------------------------------------------------------------------
 op_mul:
-    goto check2 linking r1
-    pop r7 off stack r4
-    pop r6 off stack r4
-    r5 := r6 * r7
-    push r5 on stack r4
-    goto waiting
+        goto check2 linking r1
+        pop r1 off stack r4
+        pop r5 off stack r4
+        r5 := r5 * r1
+        push r5 on stack r4
+        goto waiting
 
-
-# ---------------------------------------------------------------------------
-# '|'
-# ---------------------------------------------------------------------------
 op_bor:
-    goto check2 linking r1
-    pop r7 off stack r4   # y
-    pop r6 off stack r4   # x
+        goto check2 linking r1
+        pop r1 off stack r4
+        pop r5 off stack r4
 
-    # r5 := x | y using only nand
-    r5 := r6 nand r6      # r5 = ~x
-    r6 := r7 nand r7      # r6 = ~y
-    r5 := r5 nand r6      # r5 = x | y
+        # x | y = ~(~x & ~y)
+        r3 := r5 nand r5        # r3 = ~x
+        r1 := r1 nand r1        # r1 = ~y
+        r5 := r3 nand r1        # r5 = ~(~x & ~y) = x | y
 
-    push r5 on stack r4
-    goto waiting
+        push r5 on stack r4
+        goto waiting
 
-
-# ---------------------------------------------------------------------------
-# '&'
-# ---------------------------------------------------------------------------
 op_band:
-    goto check2 linking r1
-    pop r7 off stack r4   # y
-    pop r6 off stack r4   # x
+        goto check2 linking r1
+        pop r1 off stack r4
+        pop r5 off stack r4
+        r5 := r5 nand r1
+        r5 := r5 nand r5
+        push r5 on stack r4
+        goto waiting
 
-    # r5 := x & y using only nand
-    r5 := r6 nand r7      # r5 = ~(x & y)
-    r5 := r5 nand r5      # r5 = x & y
-
-    push r5 on stack r4
-    goto waiting
-
-
-# ---------------------------------------------------------------------------
-# '~' bitwise complement
-# ---------------------------------------------------------------------------
 op_bnot:
-    goto check1 linking r1
-    pop r5 off stack r4
-    # r5 := ~r5 via nand
-    r5 := r5 nand r5
-    push r5 on stack r4
-    goto waiting
+        goto check1 linking r1
+        pop r5 off stack r4
+        r5 := r5 nand r5
+        push r5 on stack r4
+        goto waiting
 
-
-# ---------------------------------------------------------------------------
-# 'c' change sign
-# ---------------------------------------------------------------------------
 op_csign:
-    goto check1 linking r1
-    pop r5 off stack r4
+        goto check1 linking r1
+        pop r5 off stack r4
+        r5 := r5 nand r5
+        r3 := 1
+        r5 := r5 + r3
+        push r5 on stack r4
+        goto waiting
 
-    # r5 := -r5 via two's complement: ~r5 + 1
-    r5 := r5 nand r5
-    r6 := 1
-    r5 := r5 + r6
-
-    push r5 on stack r4
-    goto waiting
-
-
-# ---------------------------------------------------------------------------
-# 's' swap top two
-# ---------------------------------------------------------------------------
 op_swap:
-    goto check2 linking r1
-    pop r7 off stack r4
-    pop r6 off stack r4
-    push r7 on stack r4
-    push r6 on stack r4
-    goto waiting
+        goto check2 linking r1
+        pop r1 off stack r4
+        pop r5 off stack r4
+        push r1 on stack r4
+        push r5 on stack r4
+        goto waiting
 
-
-# ---------------------------------------------------------------------------
-# 'd' duplicate top
-# ---------------------------------------------------------------------------
 op_dup:
-    goto check1 linking r1
-    pop r5 off stack r4
-    push r5 on stack r4
-    push r5 on stack r4
-    goto waiting
+        goto check1 linking r1
+        pop r5 off stack r4
+        push r5 on stack r4
+        push r5 on stack r4
+        goto waiting
 
-
-# ---------------------------------------------------------------------------
-# 'p' pop and discard top
-# ---------------------------------------------------------------------------
 op_pop:
-    goto check1 linking r1
-    pop r5 off stack r4       # discard
-    goto waiting
+        goto check1 linking r1
+        pop r5 off stack r4
+        goto waiting
 
-
-# ---------------------------------------------------------------------------
-# 'z' clear all values
-# ---------------------------------------------------------------------------
 op_clear:
-    r4 := values_end
-    goto waiting
+        r4 := values_end
+        goto waiting
 
-
-# ---------------------------------------------------------------------------
-# '/' signed division with calc40.c semantics
-# ---------------------------------------------------------------------------
 op_div:
-    goto check2 linking r1
-    pop r7 off stack r4       # y
-    pop r6 off stack r4       # x
+        goto check2 linking r1
+        pop r1 off stack r4     # y
+        pop r5 off stack r4     # x
 
-    # if y == 0 -> error and restore stack
-    if (r7 == 0) goto div_zero
+        if (r1 == 0) goto div_zero
 
-    # sign mask
-    r3 := 0x80000000
+        r3 := 0x80000000
 
-    # check sign of x and y via sign bit using nand
-    # r1 := r6 & r3
-    r1 := r6 nand r3
-    r1 := r1 nand r1
-    if (r1 == 0) goto x_nonneg
+        push r5 on stack r2
+        push r1 on stack r2
 
-    # x negative
-    # r1 := r7 & r3
-    r1 := r7 nand r3
-    r1 := r1 nand r1
-    if (r1 == 0) goto div_x_neg_only
-    goto div_both_neg
+        r5 := r5 & r3
+        if (r5 == 0) goto x_nonneg
+
+        pop r1 off stack r2
+        pop r5 off stack r2
+        push r5 on stack r2
+        push r1 on stack r2
+
+        r1 := r1 & r3
+        if (r1 == 0) goto div_x_neg_only
+
+        pop r1 off stack r2
+        pop r5 off stack r2
+        r5 := r5 nand r5; r3 := 1; r5 := r5 + r3
+        r1 := r1 nand r1; r3 := 1; r1 := r1 + r3
+        r5 := r5 / r1
+        push r5 on stack r4
+        goto waiting
 
 x_nonneg:
-    # r1 := r7 & r3
-    r1 := r7 nand r3
-    r1 := r1 nand r1
-    if (r1 == 0) goto div_both_nonneg
-    goto div_y_neg_only
+        pop r1 off stack r2
+        pop r5 off stack r2
+        push r5 on stack r2
+        push r1 on stack r2
+
+        r1 := r1 & r3
+        if (r1 == 0) goto div_both_nonneg
+
+        pop r1 off stack r2
+        pop r5 off stack r2
+        r1 := r1 nand r1; r3 := 1; r1 := r1 + r3
+        r5 := r5 / r1
+        r5 := r5 nand r5; r3 := 1; r5 := r5 + r3
+        push r5 on stack r4
+        goto waiting
 
 div_both_nonneg:
-    r5 := r6 / r7
-    push r5 on stack r4
-    goto waiting
-
-div_both_neg:
-    # r6 := -r6
-    r6 := r6 nand r6
-    r5 := 1
-    r6 := r6 + r5
-
-    # r7 := -r7
-    r7 := r7 nand r7
-    r5 := 1
-    r7 := r7 + r5
-
-    r5 := r6 / r7
-    push r5 on stack r4
-    goto waiting
+        pop r1 off stack r2
+        pop r5 off stack r2
+        r5 := r5 / r1
+        push r5 on stack r4
+        goto waiting
 
 div_x_neg_only:
-    # r6 := -r6
-    r6 := r6 nand r6
-    r5 := 1
-    r6 := r6 + r5
-
-    r5 := r6 / r7
-
-    # r5 := -r5
-    r5 := r5 nand r5
-    r6 := 1
-    r5 := r5 + r6
-
-    push r5 on stack r4
-    goto waiting
-
-div_y_neg_only:
-    # r7 := -r7
-    r7 := r7 nand r7
-    r5 := 1
-    r7 := r7 + r5
-
-    r5 := r6 / r7
-
-    # r5 := -r5
-    r5 := r5 nand r5
-    r6 := 1
-    r5 := r5 + r6
-
-    push r5 on stack r4
-    goto waiting
+        pop r1 off stack r2
+        pop r5 off stack r2
+        r5 := r5 nand r5; r3 := 1; r5 := r5 + r3
+        r5 := r5 / r1
+        r5 := r5 nand r5; r3 := 1; r5 := r5 + r3
+        push r5 on stack r4
+        goto waiting
 
 div_zero:
-    # "Division by zero\n"
-    output 'D'; output 'i'; output 'v'; output 'i'; output 's'; output 'i'; output 'o'; output 'n'
-    output ' '; output 'b'; output 'y'; output ' '; output 'z'; output 'e'; output 'r'; output 'o'
-    output '\n'
-    # restore x and y
-    push r6 on stack r4
-    push r7 on stack r4
-    goto waiting
+        output 'D'; output 'i'; output 'v'; output 'i'; output 's'
+        output 'i'; output 'o'; output 'n'
+        output ' '; output 'b'; output 'y'; output ' '; output 'z'
+        output 'e'; output 'r'; output 'o'
+        output '\n'
+        push r5 on stack r4
+        push r1 on stack r4
+        goto waiting
 
-
-
-###############################################################################
+################################################################################
 #                           Main Calculator FSM
-###############################################################################
+################################################################################
 
-# ---------------------------------------------------------------------------
-# main:
-#   Initializes value-stack pointer; then enters waiting state.
-# ---------------------------------------------------------------------------
+# ********** main **********
+#
+# Entry point for the calculator loop. Initializes stack pointer and
+# enters the waiting loop.
+#
+# Expects:
+#       r2 is call stack pointer.
+#       r0 is zero.
+# **************************
 main:
-    r4 := values_end
-    goto waiting
+        # Save the return address (r1) to the call stack (r2)
+        # r1 holds the address of the 'halt' instruction from callmain.ums
+        push r1 on stack r2
 
+        r4 := values_end
+        goto waiting
 
-# ---------------------------------------------------------------------------
-# waiting:
-#   Reads next character and dispatches via jump table.
-# ---------------------------------------------------------------------------
 waiting:
-    r1 := input()
+        r1 := input()
 
 waiting_with_character:
-    if (r1 == -1) goto calc_done   # EOF
+        # r5 is safe to use as temp here
+        if (r1 == -1) goto calc_done using r5
+        r5 := jumptable + r1
+        r5 := m[r0][r5]
+        goto r5
 
-    r5 := jumptable + r1
-    r5 := m[r0][r5]
-    goto r5
-
-
-# ---------------------------------------------------------------------------
-# entering:
-#   We are in the middle of reading a multi-digit numeral.
-#   If next char is digit, extend; otherwise fall back to 
-#   waiting_with_character.
-# ---------------------------------------------------------------------------
 entering:
-    r1 := input()
+        r1 := input()
+        r3 := '0'
+        if (r1 <s r3) goto entering_not_digit using r5
+        r3 := '9'
+        if (r1 >s r3) goto entering_not_digit using r5
 
-    # digit check: if r1 < '0' or r1 > '9' -> not digit
-    r6 := '0'
-    if (r1 <s r6) goto entering_not_digit
-    r6 := '9'
-    if (r1 >s r6) goto entering_not_digit
+        # Save r1 (digit char) because 'linking r1' clobbers it!
+        push r1 on stack r2
 
-    # it is a digit; extend top number: w := 10*w + (r1 - '0')
-    goto check1 linking r1
-    pop r5 off stack r4
+        goto check1 linking r1
 
-    r6 := 10
-    r5 := r5 * r6
+        # Restore r1 (digit char)
+        pop r1 off stack r2
 
-    # r6 := r1 - '0' via two's complement; avoid '-'
-    r6 := '0'
-    r6 := r6 nand r6
-    r7 := 1
-    r6 := r6 + r7       # -'0'
-    r6 := r1 + r6       # r1 - '0'
+        # Get current number from value stack
+        pop r5 off stack r4
 
-    r5 := r5 + r6
-    push r5 on stack r4
-    goto entering
+        # Multiply current by 10
+        r3 := 10
+        r5 := r5 * r3
+
+        # Calculate digit value: r1 - '0'
+        r3 := '0'
+        r3 := r3 nand r3      # r3 = ~'0'
+
+        # We need to add 1 to r3 to get -'0'.
+        # Save accumulator r5 to use r5 as temp.
+        push r5 on stack r2
+        r5 := 1
+        r3 := r3 + r5         # r3 = -'0'
+        pop r5 off stack r2   # Restore accumulator
+
+        r3 := r1 + r3         # r3 = char - '0'
+        r5 := r5 + r3         # New value = (old * 10) + digit
+
+        push r5 on stack r4
+        goto entering
 
 entering_not_digit:
-    goto waiting_with_character
+        goto waiting_with_character
 
 calc_done:
-    goto r1       # return to caller (callmain.ums)
+        # Restore the return address (r1) from the call stack
+        pop r1 off stack r2
+        goto r1
 
-
-
-###############################################################################
+################################################################################
 #                           Initialize Jump Table (init)
-###############################################################################
+################################################################################
 .section init
 
-# Initialize jump table:
-# 1. Set every entry to input_error.
-# 2. Overwrite digits '0'..'9' with digit_waiting.
-# 3. Space -> waiting
-# 4. Newline -> op_newline
-# 5. Operators -> op_* labels.
-
-    # 1) fill 0..255 with input_error
-    r5 := 0
+        r5 := 0
+        r3 := jumptable
 
 jt_fill_loop:
-    if (r5 <s 256) goto jt_fill_body
-    goto jt_fill_done
+        # using r1, r4 because signed comparisons are expensive.
+        if (r5 <s 256) goto jt_fill_body using r1, r4
+        goto jt_fill_done
 
 jt_fill_body:
-    m[r0][jumptable + r5] := input_error
-    r5 := r5 + 1
-    goto jt_fill_loop
+        m[r0][r3] := input_error
+        r3 := r3 + 1
+        r5 := r5 + 1
+        goto jt_fill_loop
 
 jt_fill_done:
-
-    # 2) digits '0'..'9'
-    r5 := '0'
+        r5 := '0'
 
 digit_jt_loop:
-    if (r5 >s '9') goto digit_jt_done
-    m[r0][jumptable + r5] := digit_waiting
-    r5 := r5 + 1
-    goto digit_jt_loop
+        # using r1, r4
+        if (r5 >s '9') goto digit_jt_done using r1, r4
+        r3 := jumptable
+        r3 := r3 + r5
+        m[r0][r3] := digit_waiting
+        r5 := r5 + 1
+        goto digit_jt_loop
 
 digit_jt_done:
-
-    # 3) space
-    m[r0][jumptable + ' '] := waiting
-
-    # 4) newline
-    m[r0][jumptable + '\n'] := op_newline
-
-    # 5) operators
-    m[r0][jumptable + '+'] := op_add
-    m[r0][jumptable + '-'] := op_sub
-    m[r0][jumptable + '*'] := op_mul
-    m[r0][jumptable + '/'] := op_div
-    m[r0][jumptable + '&'] := op_band
-    m[r0][jumptable + '|'] := op_bor
-    m[r0][jumptable + '~'] := op_bnot
-    m[r0][jumptable + 'c'] := op_csign
-    m[r0][jumptable + 's'] := op_swap
-    m[r0][jumptable + 'd'] := op_dup
-    m[r0][jumptable + 'p'] := op_pop
-    m[r0][jumptable + 'z'] := op_clear
+        r5 := jumptable + ' '
+        m[r0][r5] := waiting
+        r5 := jumptable + '\n'
+        m[r0][r5] := op_newline
+        r5 := jumptable + '+'
+        m[r0][r5] := op_add
+        r5 := jumptable + '-'
+        m[r0][r5] := op_sub
+        r5 := jumptable + '*'
+        m[r0][r5] := op_mul
+        r5 := jumptable + '/'
+        m[r0][r5] := op_div
+        r5 := jumptable + '&'
+        m[r0][r5] := op_band
+        r5 := jumptable + '|'
+        m[r0][r5] := op_bor
+        r5 := jumptable + '~'
+        m[r0][r5] := op_bnot
+        r5 := jumptable + 'c'
+        m[r0][r5] := op_csign
+        r5 := jumptable + 's'
+        m[r0][r5] := op_swap
+        r5 := jumptable + 'd'
+        m[r0][r5] := op_dup
+        r5 := jumptable + 'p'
+        m[r0][r5] := op_pop
+        r5 := jumptable + 'z'
+        m[r0][r5] := op_clear

@@ -1,19 +1,24 @@
-# urt0.ums
-# Startup runtime; sets r0 = 0 and initializes call stack in r2.
-# Calling convention:
-#   r0 = 0 always
-#   r1 = return address / return value
-#   r2 = call stack pointer (grows downward)
-#   r3,r4 = nonvolatile
-#   r5,r6,r7 = volatile
+################################################################################
+#
+#                      urt0.ums
+#
+#     Assignment: Assembly-Language Programming
+#     Authors:    Julian DuTemple (jdutem01), Tanner Vales (tvales01)
+#     Date:       2025-12-09
+#
+#     Summary:
+#       Startup runtime module. Sets up the zero register (r0) and initializes
+#       the call stack pointer (r2) before program execution begins.
+#
+################################################################################
 
-.zero  r0
+.zero r0
 .temps r6, r7
 
 .section data
+        .space 10000
 callstack:
-    .space 10000
 callstack_end:
 
 .section init
-    r2 := callstack_end
+        r2 := callstack_end

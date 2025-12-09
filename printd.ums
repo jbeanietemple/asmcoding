@@ -1,92 +1,136 @@
-# printd.ums
-# Decimal printing module.
-# Procedures:
-#   print_word: prints signed 32-bit number in r5; returns.
+################################################################################
 #
-# Calling convention:
-#   r0 = 0
-#   r1 = return address
-#   r2 = call stack
-#   r3,r4 nonvolatile; r5,r6,r7 volatile
+#                      printd.ums
+#
+#     Assignment: Assembly-Language Programming
+#     Authors:    Julian DuTemple (jdutem01), Tanner Vales (tvales01)
+#     Date:       2025-12-09
+#
+#     Summary:
+#       Decimal printing module. Provides functions to print 32-bit signed
+#       integers to stdout.
+#
+################################################################################
+
+.temps r6, r7
+.zero r0
 
 .section text
 
-# print_digit
-#   Input: r5 = digit 0..9
-#   Effect: prints digit; returns to r1.
+# ********** print_digit **********
+#
+# Helper function to print a single digit integer.
+#
+# Parameters:
+#       r5: The digit to print (0-9).
+#
+# Return:
+#       Returns to caller (r1).
+# *********************************
 print_digit:
-    r5 := r5 + '0'
-    output r5
-    goto r1
+        r6 := '0'
+        r5 := r5 + r6
+        output r5
+        goto r1
 
-# print_pos
-#   Input: r5 > 0 (positive integer)
-#   Effect: prints r5 in decimal; returns.
+# ********** print_pos **********
+#
+# Recursively prints a positive integer in decimal.
+#
+# Parameters:
+#       r5: The positive integer to print.
+#
+# Return:
+#       Returns to caller (r1).
+#
+# Expects:
+#       r5 >= 0.
+# *******************************
 print_pos:
-    push r1 on stack r2
-    push r3 on stack r2
-    push r4 on stack r2
+        push r1 on stack r2
+        push r3 on stack r2
+        push r4 on stack r2
 
-    r3 := 10
-    if (r5 < r3) goto pp_one_digit
+        r3 := 10
+        # using r4 as temp
+        if (r5 <s r3) goto pp_one_digit using r4
 
-    # q = r5 / 10  (in r4), rem = r5 - q*10 (in r3)
-    r4 := r5 / r3
-    r3 := r5 - r4 * 10
-    r5 := r4
-    goto print_pos linking r1   # recursive call with q in r5
-    r5 := r3                    # remainder
-    goto print_digit linking r1
-    goto pp_done
+        r4 := r5 / r3
+        r3 := r4 * 10
+        r3 := r5 - r3
+        r5 := r4
+        goto print_pos linking r1
+        r5 := r3
+        goto print_digit linking r1
+        goto pp_done
 
 pp_one_digit:
-    goto print_digit linking r1
+        goto print_digit linking r1
 
 pp_done:
-    pop r4 off stack r2
-    pop r3 off stack r2
-    pop r1 off stack r2
-    goto r1
+        pop r4 off stack r2
+        pop r3 off stack r2
+        pop r1 off stack r2
+        goto r1
 
-# print_word
-#   Input: r5 = signed 32-bit number
-#   Effect: prints r5 in decimal; returns.
+# ********** print_word **********
+#
+# Prints a signed 32-bit integer in decimal. Handles zero and
+# INT_MIN (0x80000000) as special cases.
+#
+# Parameters:
+#       r5: The 32-bit signed integer to print.
+#
+# Return:
+#       Returns to caller (r1).
+# ********************************
 print_word:
-    push r1 on stack r2
-    push r3 on stack r2
-    push r4 on stack r2
+        push r1 on stack r2
+        push r3 on stack r2
+        push r4 on stack r2
 
-    # zero case
-    if (r5 == 0) goto pw_zero
+        if (r5 == 0) goto pw_zero
 
-    # INT_MIN special case: 0x80000000
-    r3 := 0x80000000
-    if (r5 == r3) goto pw_intmin
+        r3 := 0x80000000
+        # FIX: "using r4" helps this register-register comparison
+        if (r5 == r3) goto pw_intmin using r4
 
-    # negative?
-    if (r5 < 0) goto pw_neg
+        # using r3, r4 as temps
+        if (r5 <s 0) goto pw_neg using r3, r4
 
-    # positive
-    goto print_pos linking r1
-    goto pw_done
+        goto print_pos linking r1
+        goto pw_done
 
 pw_zero:
-    output '0'
-    goto pw_done
+        r6 := '0'
+        output r6
+        goto pw_done
 
 pw_intmin:
-    output '-'
-    output '2'; output '1'; output '4'; output '7'; output '4'
-    output '8'; output '3'; output '6'; output '4'; output '8'
-    goto pw_done
+        r6 := '-'
+        output r6
+        r6 := '2'; output r6
+        r6 := '1'; output r6
+        r6 := '4'; output r6
+        r6 := '7'; output r6
+        r6 := '4'; output r6
+        r6 := '8'; output r6
+        r6 := '3'; output r6
+        r6 := '6'; output r6
+        r6 := '4'; output r6
+        r6 := '8'; output r6
+        goto pw_done
 
 pw_neg:
-    output '-'
-    r5 := -r5
-    goto print_pos linking r1
+        r6 := '-'
+        output r6
+        r5 := r5 nand r5
+        r6 := 1
+        r5 := r5 + r6
+        goto print_pos linking r1
 
 pw_done:
-    pop r4 off stack r2
-    pop r3 off stack r2
-    pop r1 off stack r2
-    goto r1
+        pop r4 off stack r2
+        pop r3 off stack r2
+        pop r1 off stack r2
+        goto r1

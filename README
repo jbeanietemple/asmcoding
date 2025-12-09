@@ -1,0 +1,87 @@
+COMP 40 - Assembly Language Programming
+Authors: Julian DuTemple (jdutem01), Tanner Vales (tvales01)
+Date:    Dec 9, 2025
+
+1) Collaboration / acknowledgments
+---------------------------------
+Help: Course lectures, specification documents, and TA office hours.
+External code: None. We did not share code with other students or look at
+any other implementations.
+
+2) What is implemented
+-----------------------
+Correctly implemented:
+- RPN Calculator Core:
+  - Finite State Machine with 'waiting' and 'entering' states.
+  - Multi-digit number entry logic.
+  - Jump table dispatch for all 256 ASCII characters.
+- Operators:
+  - All arithmetic (+, -, *, /) including signed division logic.
+  - Bitwise operations (&, |, ~).
+  - Stack manipulations (swap, dup, pop, clear).
+- Error Handling:
+  - Stack underflow detection with correct pluralization ("element" vs
+    "elements").
+  - Division by zero detection.
+  - Unknown character reporting.
+- Print Module:
+  - Correct printing of signed 32-bit integers, including edge cases like
+    0 and INT_MIN.
+- Macro usage:
+  - Correct usage of UMASM macros for stack operations and control flow.
+
+Not implemented:
+- None. To our knowledge, all functionality matches the reference 
+implementation.
+
+3) Departures from calling convention
+-------------------------------------
+None. We strictly adhered to the recommended convention:
+- r0 is always 0.
+- r1 is the return address / result / scratch.
+- r2 is the call stack pointer.
+- r3, r4 are non-volatile registers.
+- r5, r6, r7 are volatile/temporary registers.
+
+4) Print module implementation
+------------------------------
+We used a recursive function `print_pos` to print digits in order, with wrapper
+logic in `print_word` to handle zero, negative signs, and the INT_MIN edge case.
+
+5) Value stack representation
+-----------------------------
+The value stack is a contiguous 10,000-word block labeled `values` in the data
+section, managed by register `r4` which points to the current top element.
+
+6) Sections
+------------
+- .section data
+  Allocates static memory for the value stack and the call stack.
+- .section text
+  Contains the executable assembly code for the calculator logic, helper
+  functions, and print module.
+- .section rodata
+  Allocates space for the 256-entry jump table used by the main input loop.
+- .section init
+  Contains initialization code to populate the jump table and the final
+  startup sequence to call main.
+
+7) How to build and run
+-----------------------
+To compile:
+- Run the provided script:
+  ./compile
+  (Note: If execution is denied, run 'chmod +x compile' first)
+
+To run:
+- ./um calc40.um < input.txt
+
+8) Hours spent
+--------------
+Approximate hours:
+- Analyzing the assignment:
+  - 4 hours
+- Writing assembly code:
+  - 12 hours
+- Debugging the calculator:
+  - 10 hours
