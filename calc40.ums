@@ -36,8 +36,9 @@ readin:
     r5 := m[r0][r5]
     goto r5
 
-
+#   Handle reading in digits
 digit:
+    6 := r6 - '0'
     r7 = input()                    
     if (r7 == -1) goto endin
     if (r7 == '\n') goto enddigitprint
@@ -57,7 +58,7 @@ enddigitprint:
     r3 := r3 + 1
     goto printstack
 
-
+#   Handle end of operations
 endin:
     if (r3 == 0) goto r1
     pop stack r2
@@ -65,6 +66,7 @@ endin:
     goto endin
 
 
+#   Handle printing of the stack
 printstack:
     r6 := r3                        
     r7 := r2
@@ -86,12 +88,8 @@ printnext:
     r6 := r6 - 1                    # Decrement counter
     r7 := r7 - 1                    # Move down the stack
     goto printstackloop
-    
-
 endloop:
     goto waiting
-
-
 
 printstring:
     r7 := m[r0][r4]            
@@ -229,7 +227,7 @@ swap:
 m[r0][jumptable + ’c’] := changesign
 .section text
 changesign:
-    if (r3 < 2) goto not1arg
+    if (r3 < 1) goto not1arg
     pop r7 off stack r2
     r5 := r0 - r7
     push r5 on stack r2
@@ -242,7 +240,7 @@ changesign:
 m[r0][jumptable + ’~’] := bitcomp
 .section text
 bitcomp:
-    if (r3 < 2) goto not1arg
+    if (r3 < 1) goto not1arg
     pop r7 off stack r2
     r5 := r7 !& r7
     push r5 on stack r2
@@ -255,7 +253,7 @@ bitcomp:
 m[r0][jumptable + ’d’] := duplicate
 .section text
 duplicate:
-    if (r3 < 2) goto not1arg
+    if (r3 < 1) goto not1arg
     pop r7 off stack r2
     push r7 on stack r2
     push r7 on stack r2
@@ -269,7 +267,7 @@ duplicate:
 m[r0][jumptable + ’p’] := popone
 .section text
 popone:
-    if (r3 < 2) goto not1arg
+    if (r3 < 1) goto not1arg
     pop stack r2
     r3 := r3 - 1
     goto waiting
@@ -360,131 +358,3 @@ invalidcharmsg:
 ###############################################################################
 .section rodata
 jumptable:
-    .data nothing               //  Case 0 
-    .data nothing       
-    .data nothing
-    .data nothing       
-    .data nothing
-    .data nothing       
-    .data nothing
-    .data nothing       
-    .data nothing       
-    .data nothing     
-    .data printcommand          //  Case 10: Return
-    .data nothing       
-    .data nothing              
-    .data printcommand          //  Case 13: Return
-    .data nothing       
-    .data nothing      
-    .data nothing       
-    .data nothing      
-    .data nothing       
-    .data nothing       
-    .data nothing               //  Case 20
-    .data nothing       
-    .data nothing
-    .data nothing       
-    .data nothing
-    .data nothing       
-    .data nothing
-    .data nothing       
-    .data nothing       
-    .data nothing      
-    .data nothing               //  Case 30
-    .data nothing               //  Case 31
-    .data space                 //  Case 32: Space
-    .data invalid               
-    .data invalid               
-    .data invalid               
-    .data invalid   
-    .data invalid               
-    .data bitand                //  Case 38: &
-    .data invalid
-    .data invalid               //  Case 40
-    .data invalid
-    .data mult                  //  Case 42: *
-    .data add                   //  Case 43: +
-    .data invalid
-    .data invalid
-    .data invalid
-    .data divide                //  Case 47: /
-    .data digit     // 0        //  Case 48: begin nums
-    .data digit
-    .data digit
-    .data digit
-    .data digit
-    .data digit
-    .data digit
-    .data digit
-    .data digit
-    .data digit     // 9        //  Case 57: end nums
-    .data invalid
-    .data invalid
-    .data invalid               //  Case 60
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid               //  Case 70
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid               //  Case 80
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid               //  Case 90
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data changesign            //  Case 99: c
-    .data duplicate             //  Case 100: d
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid               //  Case 110
-    .data invalid
-    .data popfromstack          //  Case 112: p
-    .data invalid
-    .data invalid
-    .data swapstack             //  Case 115: s
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid
-    .data invalid               //  Case 120
-    .data invalid
-    .data clearstack            //  Case 122: z
-    .data invalid
-    .data bitor                 //  Case 124: |
-    .data invalid
-    .data bitcomplement         //  Case 126: ~
-    .data invalid               //  Case 127
