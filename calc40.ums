@@ -45,6 +45,7 @@ digit:
     r5 := m[r0][r5]
     if (m[r0][r5] != digit) goto enddigit
     r6 := r6 * 10
+    r7 := r7 - '0'
     r6 := r6 + r7
     goto digit
 enddigit:
@@ -84,7 +85,7 @@ printnext:
     output '\n'                     # Print newline after each number
     r6 := r6 - 1                    # Decrement counter
     r7 := r7 - 1                    # Move down the stack
-    goto printloop
+    goto printstackloop
     
 
 endloop:
@@ -228,6 +229,7 @@ swap:
 m[r0][jumptable + ’c’] := changesign
 .section text
 changesign:
+    if (r3 < 2) goto not1arg
     pop r7 off stack r2
     r5 := r0 - r7
     push r5 on stack r2
@@ -240,6 +242,7 @@ changesign:
 m[r0][jumptable + ’~’] := bitcomp
 .section text
 bitcomp:
+    if (r3 < 2) goto not1arg
     pop r7 off stack r2
     r5 := r7 !& r7
     push r5 on stack r2
@@ -252,6 +255,7 @@ bitcomp:
 m[r0][jumptable + ’d’] := duplicate
 .section text
 duplicate:
+    if (r3 < 2) goto not1arg
     pop r7 off stack r2
     push r7 on stack r2
     push r7 on stack r2
@@ -265,6 +269,7 @@ duplicate:
 m[r0][jumptable + ’p’] := popone
 .section text
 popone:
+    if (r3 < 2) goto not1arg
     pop stack r2
     r3 := r3 - 1
     goto waiting
